@@ -18,6 +18,13 @@ node{
 		sh 'docker login / docker login -u <username> -p <password>'
     		sh 'push siva9948/nodeapp'
 	}
-	stage('deploy application in kubernetes'){
+	stage ('K8S Deploy') {
+       
+                kubernetesDeploy(
+                    configs: 'new-nodejs/nodejs.yml',
+                    kubeconfigId: 'K8s-id',
+                    enableConfigSubstitution: true
+                    )               
+        }
 		
 }
