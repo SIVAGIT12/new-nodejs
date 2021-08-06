@@ -351,8 +351,9 @@ vi jenkinsconfiguration.yml
 
 EKS clutser created:
 ------------------------
-1. eksctl has been configured
-2. kubectl has been configured
+1. awscli configured
+2. eksctl has been configured
+3. kubectl has been configured
 
 
 Jenkins piepline:
