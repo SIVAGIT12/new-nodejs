@@ -361,9 +361,9 @@ Jenkins piepline:
 plugins:
 --------
 1. docker pipeline plugin
-2. docker plugin
+2. CloudBees docker build and publish plugin
 3. kubernetes continous deploy plugin
-4. nodejs
+4. nodejs plugin
 
 Global credentials:
 --------------------
