@@ -16,6 +16,8 @@ node{
 	}
 	stage('login to dockerhub and push image '){
 		sh 'docker login / docker login -u <username> -p <password>'
-    sh 'push siva9948/nodeapp'
+    		sh 'push siva9948/nodeapp'
 	}
+	stage('deploy application in kubernetes'){
+		
 }
