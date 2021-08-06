@@ -1,0 +1,372 @@
+steps for task:
+------------------
+
+linux: ubuntu
+
+using terraform provisioned servers for task:
+---------------------------------------------
+
+1.  Server-1 :  For jenkins and docker 
+
+provider "aws" {
+  region = "us-east-1"
+  access_key = "............."
+  secret_key = "....................."
+}
+resource "aws_vpc" "myvpc" {
+  cidr_block = "10.0.0.0/27"
+  tags = {
+    Name = "myvpc"
+  }
+}
+resource "aws_subnet" "mysubnet" {
+  cidr_block = "10.0.0.0/28"
+  vpc_id = aws_vpc.myvpc.id
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "mysubnet"
+  }
+}
+resource "aws_internet_gateway" "mygateway" {
+  vpc_id = aws_vpc.myvpc.id
+  tags = {
+    Name = "mygateway"
+  }
+}
+resource "aws_route_table" "my_route" {
+  vpc_id = aws_vpc.myvpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.mygateway.id
+  }
+}
+resource "aws_route_table_association" "myroute" {
+  route_table_id = aws_route_table.my_route.id
+  subnet_id = aws_subnet.mysubnet.id
+}
+resource "aws_security_group" "mysecurity" {
+  name = "my_security"
+  vpc_id = aws_vpc.myvpc.id
+  ingress {
+    from_port = 0
+    protocol = "-1"
+    to_port = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    protocol = "-1"
+    to_port = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_instance" "ec2" {
+  ami = "ami-09e67e426f25ce0d7"
+  instance_type = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.mysecurity.id]
+  subnet_id = aws_subnet.mysubnet.id
+  key_name = "nvirginea_keys"
+  associate_public_ip_address = true
+  tags = {
+    Name = "jenkins"
+  }
+}
+
+
+2. ansible server (installed in the terraform server )
+
+a. already we have teraform configured in a server in the same server i installed ansible
+b. https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-ubuntu 
+
+3. eks cluster
+vi variable.tf
+
+variable "region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "cluster_name" {
+  type    = string
+  default = "devops-task"
+}
+
+variable "k8s_version" {
+  type = string
+}
+
+variable "release_version" {
+  type    = string
+}
+
+variable "min_node_count" {
+  type    = number
+  default = 1
+}
+
+variable "max_node_count" {
+  type    = number
+  default = 2
+}
+
+variable "machine_type" {
+  type    = string
+  default = "t2.small"
+}
+
+
+vi k8-control-plane.tf
+
+resource "aws_eks_cluster" "primary" {
+  name            = var.cluster_name
+  role_arn        = aws_iam_role.control_plane.arn
+  version         = var.k8s_version
+
+  vpc_config {
+    security_group_ids = [aws_security_group.worker.id]
+    subnet_ids         = aws_subnet.worker[*].id
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.cluster,
+    aws_iam_role_policy_attachment.service,
+  ]
+}
+
+resource "aws_iam_role" "control_plane" {
+  name = "devops-task-control-plane"
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "eks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "cluster" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.control_plane.name
+}
+
+resource "aws_iam_role_policy_attachment" "service" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+  role       = aws_iam_role.control_plane.name
+}
+
+resource "aws_vpc" "worker" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    "Name"                                      = "devops-task"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  }
+}
+
+resource "aws_security_group" "worker" {
+  name        = "devops-task"
+  description = "Cluster communication with worker nodes"
+  vpc_id      = aws_vpc.worker.id
+  ingress {
+    from_port = 0
+    protocol = "-1"
+    to_port = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "devops-task"
+  }
+}
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+resource "aws_subnet" "worker" {
+  count                   = 3
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  cidr_block              = "10.0.${count.index}.0/24"
+  vpc_id                  = aws_vpc.worker.id
+  map_public_ip_on_launch = true
+  tags = {
+    "Name"                                      = "devops-task"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  }
+}
+
+
+vi k8-worker-node.tf
+
+
+resource "aws_eks_node_group" "primary" {
+  cluster_name    = aws_eks_cluster.primary.name
+  version         = var.k8s_version
+  release_version = var.release_version
+  node_group_name = "devops-task"
+  node_role_arn   = aws_iam_role.worker.arn
+  subnet_ids      = aws_subnet.worker[*].id
+  instance_types  = [var.machine_type]
+  scaling_config {
+    desired_size = var.min_node_count
+    max_size     = var.max_node_count
+    min_size     = var.min_node_count
+  }
+  depends_on = [
+    aws_iam_role_policy_attachment.worker,
+    aws_iam_role_policy_attachment.cni,
+    aws_iam_role_policy_attachment.registry,
+  ]
+  timeouts {
+    create = "15m"
+    update = "1h"
+  }
+}
+
+resource "aws_iam_role" "worker" {
+  name = "devops-task-worker"
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.worker.name
+}
+
+resource "aws_iam_role_policy_attachment" "cni" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.worker.name
+}
+
+resource "aws_iam_role_policy_attachment" "registry" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.worker.name
+}
+
+resource "aws_internet_gateway" "worker" {
+  vpc_id = aws_vpc.worker.id
+  tags = {
+    Name = "devops-task"
+  }
+}
+
+resource "aws_route_table" "worker" {
+  vpc_id = aws_vpc.worker.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.worker.id
+  }
+}
+
+resource "aws_route_table_association" "worker" {
+  count = 3
+  subnet_id      = aws_subnet.worker[count.index].id
+  route_table_id = aws_route_table.worker.id
+}
+
+
+vi provider.tf
+
+provider "aws" {
+  region = var.region
+}
+
+
+Using ansible Configured softwares in jenkins and docker server:
+------------------------------------------------------------------
+
+vi jenkinsconfiguration.yml
+
+---
+- name: installing jenkis via ansible
+  hosts: webserver
+  tasks:
+    - name: installing openjdk-8-jre
+      apt:
+       name: openjdk-8-jre
+       state: present
+       update_cache: yes
+
+    - name: ensure the jenkins apt repository key is installed
+      apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
+      become: yes
+
+    - name: ensure the repository is configured
+      apt_repository: repo='deb https://pkg.jenkins.io/debian-stable binary/' state=present
+      become: yes
+
+    - name: ensure jenkins is installed
+      apt:
+       name: jenkins
+       state: present
+       update_cache: yes
+
+
+    - name: ensure jenkins is running
+      service: name=jenkins state=started
+
+    - name: Install docker.
+      package:
+       name: docker.io
+       state: present
+    - name: Start docker service
+      service:
+       name: docker
+       state: started
+
+    - name: adding jenkins to docker group
+      user:
+       name: jenkins
+       groups: docker
+       append: yes
+
+    - name: installing nodejs and npm
+      apt:
+       name: "{{item.a}}"
+       state: present
+       update_cache: yes
+      with_items:
+       - {a: nodejs}
+       - {a: npm}
+
+EKS clutser created:
+------------------------
+1. eksctl has been configured
+2. kubectl has been configured
+
+
+Jenkins piepline:
+---------------
+plugins:
+--------
+1. docker pipeline plugin
+2. docker plugin
+3. kubernetes continous deploy plugin
+4. nodejs
+
+Global credentials:
+--------------------
+1. Stored DockerHub credentials in the Global credentials
+2. Stored kubeconfig information
+
+
