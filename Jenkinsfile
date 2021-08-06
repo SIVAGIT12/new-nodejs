@@ -1,6 +1,6 @@
 node{
 	stage('git checkout'){
-		git 'https://github.com/SIVAGIT12/new-nodejs.git'
+		checkout([$class: 'GitSCM', branches: [[name: 'main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/SIVAGIT12/new-nodejs.git']]])
 	}
 	stage('installing dependencies'){
 		sh 'npm install'
