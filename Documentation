@@ -73,12 +73,16 @@ resource "aws_instance" "ec2" {
 }
 
 
-2. ansible server (installed in the terraform server )
+2. ansible  (installed in the terraform server )
 
-a. already we have teraform configured in a server in the same server i installed ansible
-b. https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-ubuntu 
+a. already i configured terraform in a server in the same server i installed ansible
+b. sudo apt update
+c. sudo apt install software-properties-common
+d. sudo add-apt-repository --yes --update ppa:ansible/ansible
+e. sudo apt install ansible 
 
 3. eks cluster
+
 vi variable.tf
 
 variable "region" {
@@ -291,6 +295,12 @@ provider "aws" {
   region = var.region
 }
 
+EKS clutser created:
+------------------------
+1. awscli configured
+2. eksctl has been configured
+3. kubectl has been configured
+
 
 Using ansible Configured softwares in jenkins and docker server:
 ------------------------------------------------------------------
@@ -340,20 +350,12 @@ vi jenkinsconfiguration.yml
        groups: docker
        append: yes
 
-    - name: installing nodejs and npm
+    - name: installing npm
       apt:
-       name: "{{item.a}}"
+       name: npm
        state: present
        update_cache: yes
-      with_items:
-       - {a: nodejs}
-       - {a: npm}
-
-EKS clutser created:
-------------------------
-1. awscli configured
-2. eksctl has been configured
-3. kubectl has been configured
+      
 
 
 Jenkins piepline:
