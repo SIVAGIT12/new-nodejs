@@ -1,30 +1,36 @@
-node{
-	stage('git checkout'){
-		checkout([$class: 'GitSCM', branches: [[name: 'main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/SIVAGIT12/new-nodejs.git']]])
-	}
-	stage('installing dependencies'){
-		sh 'npm install'
-	}
-	stage('npm test'){
-		sh 'npm run test'
-	}
-	stage('build'){
-		sh 'npm run build'
-	}
-	stage('creating docker image'){
-		sh 'docker build -t siva9948/nodeapp:1 .'
-	}
-	stage('login to dockerhub and push image '){
-		sh 'docker login / docker login -u <username> -p <password>'
-    		sh 'push siva9948/nodeapp'
-	}
-	stage ('K8S Deploy') {
-       
-                kubernetesDeploy(
-                    configs: 'new-nodejs/nodejs.yml',
-                    kubeconfigId: 'K8s-id',
-                    enableConfigSubstitution: true
-                    )               
+pipeline{
+    agent any
+    stages{
+        stage('checkout'){
+            steps{
+                checkout([$class: 'GitSCM', branches: [[name: 'main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/SIVAGIT12/new-nodejs.git']]])
+            }
         }
-		
+        stage('installing dependencies'){
+            steps{
+                sh 'npm install'
+            }
+        }
+        stage('build'){
+            steps{
+                sh 'npm run build'
+            }
+        }
+        stage('create image'){
+            steps{
+                sh 'docker build -t siva9948/nodeapp:1 .'
+            }
+        }
+        stage('push image to dockerhub'){
+            steps{
+                script{
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'password', usernameVariable: 'username')]) {
+                sh 'docker login -u ${username} -p ${password}'
+                
+                sh 'docker push siva9948/nodeapp:1'
+                    }
+                }
+            }
+        }
+    }
 }
