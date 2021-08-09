@@ -322,9 +322,9 @@ vi jenkinsconfiguration.yml
 - name: installing jenkis via ansible
   hosts: webserver
   tasks:
-    - name: installing openjdk-8-jre
+    - name: installing openjdk-11-jdk
       apt:
-       name: openjdk-8-jre
+       name: openjdk-11-jdk
        state: present
        update_cache: yes
 
