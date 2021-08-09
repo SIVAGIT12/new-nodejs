@@ -1,12 +1,14 @@
 steps for task:
 ------------------
 
-linux: ubuntu
+linux: ubuntu 20.4 lts
 
 using terraform provisioned servers for task:
 ---------------------------------------------
 
 1.  Server-1 :  For jenkins and docker 
+
+vi jenkins.yml
 
 provider "aws" {
   region = "us-east-1"
@@ -73,15 +75,12 @@ resource "aws_instance" "ec2" {
 }
 
 
-2. ansible  (installed in the terraform server )
 
-a. already i configured terraform in a server in the same server i installed ansible
-b. sudo apt update
-c. sudo apt install software-properties-common
-d. sudo add-apt-repository --yes --update ppa:ansible/ansible
-e. sudo apt install ansible 
 
-3. eks cluster
+* version 1.20
+* version release 1.20.4-20210722
+
+2. eks cluster
 
 vi variable.tf
 
@@ -295,15 +294,27 @@ provider "aws" {
   region = var.region
 }
 
-EKS clutser created:
-------------------------
-1. awscli configured
-2. eksctl has been configured
-3. kubectl has been configured
+
+3. ansible  (installed in the terraform server )
+
+a. already i configured terraform in a server in the same server i installed ansible
+b. sudo apt update
+c. sudo apt install software-properties-common
+d. sudo add-apt-repository --yes --update ppa:ansible/ansible
+e. sudo apt install ansible 
+
+4. configuration of EKS clutser :
+   ===========================
+a. awscli configured
+b. eksctl has been configured
+c. kubectl has been configured
+d. configure computer to communicate with cluster:
+   ==============================================
+  * aws eks update-kubeconfig   --region <regean with code>   --name <cluster name>
 
 
-Using ansible Configured softwares in jenkins and docker server:
-------------------------------------------------------------------
+5. Using ansible Configured softwares in jenkins and docker server:
+   ==================================================================
 
 vi jenkinsconfiguration.yml
 
@@ -360,16 +371,18 @@ vi jenkinsconfiguration.yml
 
 Jenkins piepline:
 ---------------
+a. passwordless authentication with ansible server 
+b. ssh between jenkins user and ubuntu user 
+
 plugins:
 --------
 1. docker pipeline plugin
 2. CloudBees docker build and publish plugin
-3. kubernetes continous deploy plugin
+3. sshAgent
 
 
 Global credentials:
 --------------------
 1. Stored DockerHub credentials in the Global credentials
-2. Stored kubeconfig information
 
 
