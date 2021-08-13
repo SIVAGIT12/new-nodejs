@@ -34,8 +34,8 @@ pipeline{
         }
         stage('k8s deployment'){
             steps{
-                sh 'ssh ubuntu@172.31.3.214 kubectl apply -f deployment.yml'
-                sh 'ssh ubuntu@172.31.3.214 kubectl apply -f service.yml'
+                sh 'ssh ubuntu@172.31.43.52 kubectl apply -f deployment.yml'
+                sh 'ssh ubuntu@172.31.43.52 kubectl apply -f service.yml'
                 
             }
         }
